@@ -182,15 +182,11 @@ fn test_hash_file_hello() {
     fs::write(&file_path, "hello").expect("Failed to write test file");
 
     let mut cmd = get_cmd();
-    cmd.arg("hash")
-        .arg("--file")
-        .arg(file_path.as_os_str());
+    cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-        ));
+    cmd.assert().success().stdout(predicate::str::contains(
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+    ));
 }
 
 #[test]
@@ -200,22 +196,18 @@ fn test_hash_file_empty() {
     fs::write(&file_path, "").expect("Failed to write test file");
 
     let mut cmd = get_cmd();
-    cmd.arg("hash")
-        .arg("--file")
-        .arg(file_path.as_os_str());
+    cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        ));
+    cmd.assert().success().stdout(predicate::str::contains(
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ));
 }
 
 #[test]
 fn test_hash_file_large_chunked() {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let file_path = temp_dir.path().join("large.txt");
-    
+
     // Create a file larger than 64 KiB to test chunking (~100 KiB)
     let mut file = fs::File::create(&file_path).expect("Failed to create test file");
     let data = b"The quick brown fox jumps over the lazy dog\n";
@@ -231,30 +223,30 @@ fn test_hash_file_large_chunked() {
         "sha256sum '{}' | cut -d' ' -f1",
         file_path.to_str().unwrap()
     ));
-    
+
     let sha256sum_output = sha256sum_cmd.output();
-    
+
     let mut cmd = get_cmd();
-    cmd.arg("hash")
-        .arg("--file")
-        .arg(file_path.as_os_str());
+    cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
     // If sha256sum is available, compare hashes
     if let Ok(output) = sha256sum_output {
         if output.status.success() {
-            let sha256sum_hash = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
+            let sha256sum_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
             let cmd_output = cmd.output().expect("Failed to execute command");
             let stdout = String::from_utf8_lossy(&cmd_output.stdout);
-            
-            assert!(stdout.contains(&sha256sum_hash), 
-                "Hash mismatch. Expected: {}, Got: {}", sha256sum_hash, stdout);
+
+            assert!(
+                stdout.contains(&sha256sum_hash),
+                "Hash mismatch. Expected: {}, Got: {}",
+                sha256sum_hash,
+                stdout
+            );
             return;
         }
     }
-    
+
     // Always verify our tool completes successfully even if sha256sum isn't available
     cmd.assert().success();
 }
@@ -272,26 +264,26 @@ fn test_hash_file_matches_sha256sum() {
         "sha256sum '{}' | cut -d' ' -f1",
         file_path.to_str().unwrap()
     ));
-    
+
     let sha256sum_output = sha256sum_cmd.output();
-    
+
     let mut cmd = get_cmd();
-    cmd.arg("hash")
-        .arg("--file")
-        .arg(file_path.as_os_str());
+    cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
     // If sha256sum is available, compare hashes
     if let Ok(output) = sha256sum_output {
         if output.status.success() {
-            let sha256sum_hash = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
+            let sha256sum_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
             let cmd_output = cmd.output().expect("Failed to execute command");
             let stdout = String::from_utf8_lossy(&cmd_output.stdout);
-            
-            assert!(stdout.contains(&sha256sum_hash), 
-                "Hash mismatch. Expected: {}, Got: {}", sha256sum_hash, stdout);
+
+            assert!(
+                stdout.contains(&sha256sum_hash),
+                "Hash mismatch. Expected: {}, Got: {}",
+                sha256sum_hash,
+                stdout
+            );
             return;
         }
     }

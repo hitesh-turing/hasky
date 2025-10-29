@@ -126,8 +126,8 @@ fn compute_sha256(data: &[u8]) -> String {
 fn hash_file_sha256(file_path: &str) -> Result<String> {
     const CHUNK_SIZE: usize = 64 * 1024; // 64 KiB
 
-    let file = File::open(file_path)
-        .with_context(|| format!("Failed to open file: {}", file_path))?;
+    let file =
+        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
 
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
