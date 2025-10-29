@@ -183,7 +183,8 @@ fn test_sha256_case_insensitive() {
 }
 
 #[test]
-fn test_unsupported_algorithm() {
+fn test_insecure_algorithm_requires_flag() {
+    // Test that md5 requires --allow-insecure
     let mut cmd = get_cmd();
     cmd.arg("hash")
         .arg("--algo")
@@ -192,7 +193,254 @@ fn test_unsupported_algorithm() {
         .arg("hello");
     cmd.assert()
         .failure()
+        .stderr(predicate::str::contains("Insecure algorithm"))
+        .stderr(predicate::str::contains("--allow-insecure"));
+
+    // Test that sha1 requires --allow-insecure
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha1")
+        .arg("--text")
+        .arg("hello");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Insecure algorithm"))
+        .stderr(predicate::str::contains("--allow-insecure"));
+}
+
+#[test]
+fn test_unsupported_algorithm() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("invalid_algo")
+        .arg("--text")
+        .arg("hello");
+    cmd.assert()
+        .failure()
         .stderr(predicate::str::contains("Unsupported algorithm"));
+}
+
+// SHA-512 test vector tests
+#[test]
+fn test_sha512_abc() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha512")
+        .arg("--text")
+        .arg("abc");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    ));
+}
+
+#[test]
+fn test_sha512_empty_string() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha512")
+        .arg("--text")
+        .arg("");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
+    ));
+}
+
+// SHA-1 test vector tests (requires --allow-insecure)
+#[test]
+fn test_sha1_abc_with_allow_insecure() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha1")
+        .arg("--allow-insecure")
+        .arg("--text")
+        .arg("abc");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "a9993e364706816aba3e25717850c26c9cd0d89d",
+        ))
+        .stderr(predicate::str::contains("WARNING"));
+}
+
+#[test]
+fn test_sha1_empty_string_with_allow_insecure() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha1")
+        .arg("--allow-insecure")
+        .arg("--text")
+        .arg("");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+    ));
+}
+
+// MD5 test vector tests (requires --allow-insecure)
+#[test]
+fn test_md5_abc_with_allow_insecure() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("md5")
+        .arg("--allow-insecure")
+        .arg("--text")
+        .arg("abc");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("900150983cd24fb0d6963f7d28e17f72"))
+        .stderr(predicate::str::contains("WARNING"));
+}
+
+#[test]
+fn test_md5_empty_string_with_allow_insecure() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("md5")
+        .arg("--allow-insecure")
+        .arg("--text")
+        .arg("");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("d41d8cd98f00b204e9800998ecf8427e"));
+}
+
+// BLAKE3 test vector tests
+#[test]
+fn test_blake3_abc() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("blake3")
+        .arg("--text")
+        .arg("abc");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85",
+    ));
+}
+
+#[test]
+fn test_blake3_empty_string() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("blake3")
+        .arg("--text")
+        .arg("");
+    // BLAKE3 of empty string
+    cmd.assert().success().stdout(predicate::str::contains(
+        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+    ));
+}
+
+#[test]
+fn test_blake3_case_insensitive() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("BLAKE3") // uppercase
+        .arg("--text")
+        .arg("abc");
+    cmd.assert().success().stdout(predicate::str::contains(
+        "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85",
+    ));
+}
+
+// Test file hashing with different algorithms
+#[test]
+fn test_hash_file_sha512() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "abc").expect("Failed to write test file");
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha512")
+        .arg("--file")
+        .arg(file_path.as_os_str());
+
+    cmd.assert().success().stdout(predicate::str::contains(
+        "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    ));
+}
+
+#[test]
+fn test_hash_file_blake3() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "abc").expect("Failed to write test file");
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("blake3")
+        .arg("--file")
+        .arg(file_path.as_os_str());
+
+    cmd.assert().success().stdout(predicate::str::contains(
+        "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85",
+    ));
+}
+
+#[test]
+fn test_hash_file_md5_with_allow_insecure() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "abc").expect("Failed to write test file");
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("md5")
+        .arg("--allow-insecure")
+        .arg("--file")
+        .arg(file_path.as_os_str());
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("900150983cd24fb0d6963f7d28e17f72"))
+        .stderr(predicate::str::contains("WARNING"));
+}
+
+#[test]
+fn test_hash_file_sha1_with_allow_insecure() {
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let file_path = temp_dir.path().join("test.txt");
+    fs::write(&file_path, "abc").expect("Failed to write test file");
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash")
+        .arg("--algo")
+        .arg("sha1")
+        .arg("--allow-insecure")
+        .arg("--file")
+        .arg(file_path.as_os_str());
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "a9993e364706816aba3e25717850c26c9cd0d89d",
+        ))
+        .stderr(predicate::str::contains("WARNING"));
+}
+
+#[test]
+fn test_help_shows_algorithms() {
+    let mut cmd = get_cmd();
+    cmd.arg("hash").arg("--help");
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("sha256"))
+        .stdout(predicate::str::contains("sha512"))
+        .stdout(predicate::str::contains("blake3"))
+        .stdout(predicate::str::contains("--allow-insecure"));
 }
 
 // File hashing tests

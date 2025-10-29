@@ -5,10 +5,11 @@ A fast, flexible CLI for hashing with multiple algorithms built in Rust.
 ## Features
 
 - 🚀 **Fast**: Built in Rust for maximum performance
-- 🔧 **Flexible**: Support for multiple hashing algorithms
+- 🔧 **Flexible**: Support for multiple hashing algorithms (SHA-256, SHA-512, BLAKE3, SHA-1, MD5)
+- 🔒 **Security-Conscious**: Insecure algorithms (MD5, SHA-1) require explicit opt-in
 - 📁 **File Hashing**: Efficiently hash files using chunked reading (64 KiB chunks) without loading entire files into memory
 - 🐳 **Dockerized**: Easy deployment with Docker
-- ✅ **Tested**: Comprehensive unit and integration tests (verified against `sha256sum`)
+- ✅ **Tested**: Comprehensive unit and integration tests (37+ tests with verified test vectors)
 - 📦 **Lightweight**: Minimal dependencies and small binary size
 
 ## Installation
@@ -40,11 +41,19 @@ hashy --version
 # Hash a text string (default: SHA-256)
 hashy hash --text "hello world"
 
-# Hash with a specific algorithm
-hashy hash --algo sha256 --text "hello world"
+# Hash with different algorithms
+hashy hash --algo sha256 --text "rust"
+hashy hash --algo sha512 --text "rust"
+hashy hash --algo blake3 --text "rust"
 
 # Hash a file (efficiently processes large files in chunks)
 hashy hash --file myfile.txt
+hashy hash --algo blake3 --file ./Cargo.toml
+hashy hash --algo sha512 --file myfile.txt
+
+# Use insecure algorithms (requires --allow-insecure flag)
+hashy hash --algo md5 --allow-insecure --file data.bin
+hashy hash --algo sha1 --allow-insecure --text "legacy data"
 
 # Hash matches standard tools like sha256sum
 hashy hash --file myfile.txt  # Output matches: sha256sum myfile.txt
@@ -69,11 +78,23 @@ hashy --quiet hash --text "hello"
 hashy hash [OPTIONS]
 
 Options:
-  -a, --algo <ALGORITHM>    Hash algorithm to use [default: sha256]
-  -t, --text <TEXT>         Text to hash directly
-  -f, --file <FILE>         File to hash (uses chunked reading for efficiency)
-  -h, --help                Print help
+  -a, --algo <ALGORITHM>        Hash algorithm to use [default: sha256]
+                                  Supported: sha256, sha512, blake3
+                                  Insecure (requires --allow-insecure): sha1, md5
+  -t, --text <TEXT>             Text to hash directly
+  -f, --file <FILE>             File to hash (uses chunked reading for efficiency)
+      --allow-insecure          Allow use of insecure algorithms (SHA-1 and MD5)
+  -h, --help                    Print help
 ```
+
+**Supported Algorithms:**
+- **SHA-256** (default): Secure, widely used hash algorithm
+- **SHA-512**: Longer output (512 bits) for enhanced security
+- **BLAKE3**: Fast, secure, modern hash function
+- **SHA-1**: Insecure, requires `--allow-insecure` (⚠️ cryptographically broken)
+- **MD5**: Insecure, requires `--allow-insecure` (⚠️ cryptographically broken)
+
+**Security Note**: MD5 and SHA-1 are cryptographically broken and vulnerable to collision attacks. They are only available with the `--allow-insecure` flag for legacy compatibility or non-security purposes. A warning will be displayed when using these algorithms.
 
 **Note**: File hashing uses chunked reading (64 KiB chunks) to efficiently process large files without loading them entirely into memory. The output format matches standard tools like `sha256sum` for compatibility.
 
@@ -125,7 +146,7 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 
 ## Roadmap
 
-### ✅ Completed (Steps 1-4)
+### ✅ Completed (Steps 1-5)
 - [x] Project scaffolding
 - [x] CLI argument parsing with clap
 - [x] Basic command structure
@@ -136,9 +157,11 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 - [x] File input with chunked streaming (64 KiB chunks) (Step 4)
 - [x] Error handling with `anyhow`/`thiserror`
 - [x] Hash verification against `sha256sum` for compatibility
+- [x] Multiple algorithms (SHA-1, SHA-256, SHA-512, BLAKE3, MD5) (Step 5)
+- [x] Security gating for insecure algorithms (--allow-insecure flag)
+- [x] Comprehensive test vectors for all algorithms
 
 ### 🚧 Upcoming
-- [ ] Multiple algorithms (SHA1, SHA512, BLAKE3, MD5) (Step 5)
 - [ ] STDIN support (Step 6)
 - [ ] Output formatting options (Step 7)
 - [ ] Batch mode (Step 8)
@@ -158,8 +181,10 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 
 The project includes:
 - **Unit tests**: Test individual functions and modules
-- **Integration tests**: Test CLI behavior end-to-end with 22+ comprehensive tests
+- **Integration tests**: Test CLI behavior end-to-end with 37+ comprehensive tests
+- **Algorithm tests**: Test vectors verified for SHA-1, SHA-256, SHA-512, BLAKE3, and MD5
 - **Compatibility tests**: Verify hash output matches standard tools (`sha256sum`)
+- **Security tests**: Verify insecure algorithms are properly gated
 - **Large file tests**: Verify chunked reading works correctly for files >64 KiB
 - **Property tests**: (Coming in Step 16)
 - **Fuzz tests**: (Coming in Step 16)
@@ -189,7 +214,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 Built with:
 - [clap](https://github.com/clap-rs/clap) - Command line argument parsing
 - [anyhow](https://github.com/dtolnay/anyhow) - Error handling
-- [sha2](https://github.com/RustCrypto/hashes) - SHA-256 hashing implementation
+- [sha2](https://github.com/RustCrypto/hashes) - SHA-256 and SHA-512 hashing implementation
+- [sha1](https://github.com/RustCrypto/hashes) - SHA-1 hashing implementation
+- [md-5](https://github.com/RustCrypto/hashes) - MD5 hashing implementation
+- [blake3](https://github.com/BLAKE3-team/BLAKE3) - BLAKE3 hashing implementation
+- [digest](https://github.com/RustCrypto/hashes) - Unified trait for hash functions
 - [hex](https://github.com/KokaKiwi/rust-hex) - Hexadecimal encoding
 - [RustCrypto](https://github.com/RustCrypto) - Cryptographic algorithms
 
