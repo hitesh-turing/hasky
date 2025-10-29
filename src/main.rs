@@ -102,13 +102,11 @@ fn handle_hash(
 
     // Output the hash
     if !matches!(verbosity, Verbosity::Quiet) {
-        
         println!("Algorithm: {}", algo);
         if let Some(t) = text {
             println!("Text: {}", t);
         }
         println!("Output: {}", hash);
-
     }
 
     Ok(())
