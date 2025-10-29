@@ -1,6 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use sha2::{Digest, Sha256};
+use std::fs::File;
+use std::io::{BufReader, Read};
 
 /// A fast, flexible CLI for hashing with multiple algorithms
 #[derive(Parser, Debug)]
@@ -83,20 +85,18 @@ fn handle_hash(
         }
     }
 
-    // Get the input data to hash
-    let data = if let Some(t) = text {
-        t.as_bytes().to_vec()
-    } else if let Some(_f) = file {
-        // TODO: Implement file reading in next step
-        return Err(anyhow!("File hashing not yet implemented"));
-    } else {
-        // TODO: Implement stdin reading in next step
-        return Err(anyhow!("Stdin hashing not yet implemented"));
-    };
-
-    // Compute hash based on algorithm
+    // Compute hash based on algorithm and input type
     let hash = match algo.to_lowercase().as_str() {
-        "sha256" => compute_sha256(&data),
+        "sha256" => {
+            if let Some(t) = text {
+                compute_sha256(t.as_bytes())
+            } else if let Some(f) = file {
+                hash_file_sha256(f).with_context(|| format!("Failed to hash file: {}", f))?
+            } else {
+                // TODO: Implement stdin reading in next step
+                return Err(anyhow!("Stdin hashing not yet implemented"));
+            }
+        }
         _ => return Err(anyhow!("Unsupported algorithm: {}", algo)),
     };
 
@@ -105,6 +105,8 @@ fn handle_hash(
         println!("Algorithm: {}", algo);
         if let Some(t) = text {
             println!("Text: {}", t);
+        } else if let Some(f) = file {
+            println!("File: {}", f);
         }
         println!("Output: {}", hash);
     }
@@ -117,4 +119,32 @@ fn compute_sha256(data: &[u8]) -> String {
     hasher.update(data);
     let result = hasher.finalize();
     hex::encode(result)
+}
+
+/// Hash a file using SHA-256 by reading it in chunks (64 KiB).
+/// This avoids loading the entire file into memory.
+fn hash_file_sha256(file_path: &str) -> Result<String> {
+    const CHUNK_SIZE: usize = 64 * 1024; // 64 KiB
+
+    let file =
+        File::open(file_path).with_context(|| format!("Failed to open file: {}", file_path))?;
+
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; CHUNK_SIZE];
+
+    loop {
+        let bytes_read = reader
+            .read(&mut buffer)
+            .with_context(|| format!("Failed to read from file: {}", file_path))?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    let result = hasher.finalize();
+    Ok(hex::encode(result))
 }
