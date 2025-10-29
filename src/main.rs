@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Context, Result};
-use blake3;
 use clap::{Parser, Subcommand};
 use digest::Digest;
 use md5::Md5;
@@ -32,9 +31,9 @@ enum Commands {
     /// Compute hash of input (text, file, or stdin)
     Hash {
         /// Hash algorithm to use
-        /// 
+        ///
         /// Supported algorithms: sha256 (default), sha512, blake3
-        /// 
+        ///
         /// Insecure algorithms (sha1, md5) require --allow-insecure flag.
         /// WARNING: SHA-1 and MD5 are cryptographically broken and should
         /// only be used for legacy compatibility or non-security purposes.
@@ -48,7 +47,7 @@ enum Commands {
         algo: String,
 
         /// Allow use of insecure algorithms (SHA-1 and MD5)
-        /// 
+        ///
         /// WARNING: SHA-1 and MD5 are cryptographically broken and vulnerable
         /// to collision attacks. Only use these algorithms for legacy
         /// compatibility or non-security purposes.

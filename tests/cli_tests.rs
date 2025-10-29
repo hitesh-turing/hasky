@@ -293,9 +293,7 @@ fn test_md5_abc_with_allow_insecure() {
         .arg("abc");
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains(
-            "900150983cd24fb0d6963f7d28e17f72",
-        ))
+        .stdout(predicate::str::contains("900150983cd24fb0d6963f7d28e17f72"))
         .stderr(predicate::str::contains("WARNING"));
 }
 
@@ -308,9 +306,9 @@ fn test_md5_empty_string_with_allow_insecure() {
         .arg("--allow-insecure")
         .arg("--text")
         .arg("");
-    cmd.assert().success().stdout(predicate::str::contains(
-        "d41d8cd98f00b204e9800998ecf8427e",
-    ));
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("d41d8cd98f00b204e9800998ecf8427e"));
 }
 
 // BLAKE3 test vector tests
@@ -407,9 +405,7 @@ fn test_hash_file_md5_with_allow_insecure() {
 
     cmd.assert()
         .success()
-        .stdout(predicate::str::contains(
-            "900150983cd24fb0d6963f7d28e17f72",
-        ))
+        .stdout(predicate::str::contains("900150983cd24fb0d6963f7d28e17f72"))
         .stderr(predicate::str::contains("WARNING"));
 }
 
