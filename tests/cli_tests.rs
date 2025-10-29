@@ -1,13 +1,34 @@
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Write;
+use std::io::{BufReader, Read, Write};
 use std::process::Command;
 use tempfile::TempDir;
 
 fn get_cmd() -> Command {
     let bin_path = assert_cmd::cargo::cargo_bin!("hashy");
     Command::new(bin_path)
+}
+
+/// Compute SHA-256 hash of a file using chunked reading (same as main implementation)
+fn compute_file_sha256(file_path: &std::path::Path) -> String {
+    const CHUNK_SIZE: usize = 64 * 1024; // 64 KiB
+
+    let file = fs::File::open(file_path).expect("Failed to open file");
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; CHUNK_SIZE];
+
+    loop {
+        let bytes_read = reader.read(&mut buffer).expect("Failed to read from file");
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    hex::encode(hasher.finalize())
 }
 
 #[test]
@@ -217,38 +238,22 @@ fn test_hash_file_large_chunked() {
     }
     drop(file);
 
-    // Hash using sha256sum to get expected value
-    let mut sha256sum_cmd = Command::new("sh");
-    sha256sum_cmd.arg("-c").arg(format!(
-        "sha256sum '{}' | cut -d' ' -f1",
-        file_path.to_str().unwrap()
-    ));
-
-    let sha256sum_output = sha256sum_cmd.output();
+    // Compute expected hash using Rust implementation
+    let expected_hash = compute_file_sha256(&file_path);
 
     let mut cmd = get_cmd();
     cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
-    // If sha256sum is available, compare hashes
-    if let Ok(output) = sha256sum_output {
-        if output.status.success() {
-            let sha256sum_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let cmd_output = cmd.output().expect("Failed to execute command");
+    let stdout = String::from_utf8_lossy(&cmd_output.stdout);
 
-            let cmd_output = cmd.output().expect("Failed to execute command");
-            let stdout = String::from_utf8_lossy(&cmd_output.stdout);
-
-            assert!(
-                stdout.contains(&sha256sum_hash),
-                "Hash mismatch. Expected: {}, Got: {}",
-                sha256sum_hash,
-                stdout
-            );
-            return;
-        }
-    }
-
-    // Always verify our tool completes successfully even if sha256sum isn't available
-    cmd.assert().success();
+    assert!(
+        stdout.trim().contains(&expected_hash),
+        "Hash mismatch. Expected: {}, Got: {}",
+        expected_hash,
+        stdout.trim()
+    );
+    assert!(cmd_output.status.success());
 }
 
 #[test]
@@ -258,38 +263,22 @@ fn test_hash_file_matches_sha256sum() {
     let content = "The quick brown fox jumps over the lazy dog";
     fs::write(&file_path, content).expect("Failed to write test file");
 
-    // Get hash using sha256sum on the file
-    let mut sha256sum_cmd = Command::new("sh");
-    sha256sum_cmd.arg("-c").arg(format!(
-        "sha256sum '{}' | cut -d' ' -f1",
-        file_path.to_str().unwrap()
-    ));
-
-    let sha256sum_output = sha256sum_cmd.output();
+    // Compute expected hash using Rust implementation (same algorithm as sha256sum)
+    let expected_hash = compute_file_sha256(&file_path);
 
     let mut cmd = get_cmd();
     cmd.arg("hash").arg("--file").arg(file_path.as_os_str());
 
-    // If sha256sum is available, compare hashes
-    if let Ok(output) = sha256sum_output {
-        if output.status.success() {
-            let sha256sum_hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let cmd_output = cmd.output().expect("Failed to execute command");
+    let stdout = String::from_utf8_lossy(&cmd_output.stdout);
 
-            let cmd_output = cmd.output().expect("Failed to execute command");
-            let stdout = String::from_utf8_lossy(&cmd_output.stdout);
-
-            assert!(
-                stdout.contains(&sha256sum_hash),
-                "Hash mismatch. Expected: {}, Got: {}",
-                sha256sum_hash,
-                stdout
-            );
-            return;
-        }
-    }
-
-    // Always verify our tool completes successfully even if sha256sum isn't available
-    cmd.assert().success();
+    assert!(
+        stdout.trim().contains(&expected_hash),
+        "Hash mismatch. Expected: {}, Got: {}",
+        expected_hash,
+        stdout.trim()
+    );
+    assert!(cmd_output.status.success());
 }
 
 #[test]
