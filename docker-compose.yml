@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  hashy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hashy:latest
+    container_name: hashy
+    # Override entrypoint for interactive use
+    # entrypoint: ["/bin/bash"]
+    # stdin_open: true
+    # tty: true
+    volumes:
+      # Mount current directory to hash files from host
+      - ./:/data:ro
+    command: [ "--help" ]
+
+  # Service for development/testing
+  hashy-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: hashy:dev
+    container_name: hashy-dev
+    working_dir: /usr/src/hashy
+    volumes:
+      - .:/usr/src/hashy
+      - cargo-cache:/usr/local/cargo/registry
+    command: [ "cargo", "test" ]
+
+volumes:
+  cargo-cache:
+
+

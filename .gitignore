@@ -1,0 +1,33 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+*.profraw
+*.profdata
+
+# Build artifacts
+/release/
+/debug/
+
+# Environment
+.env
+.env.local
+
+# Documentation
+/doc/
+
+# Misc
+*.orig
+.cargo/
+
