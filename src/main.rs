@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use hashy::cli::Cli;
-use hashy::command::handle_hash;
+use hashy::command::{handle_hash, handle_verify};
 use hashy::verbosity::Verbosity;
 
 fn main() -> Result<()> {
@@ -38,6 +38,17 @@ fn main() -> Result<()> {
             format,
             uppercase,
             json,
+            verbosity,
+        )?;
+    } else if let Some((algo, allow_insecure, checksums_file, continue_on_error, format)) =
+        cli.command.get_verify_params()
+    {
+        handle_verify(
+            algo,
+            allow_insecure,
+            checksums_file,
+            continue_on_error,
+            format,
             verbosity,
         )?;
     }

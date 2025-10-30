@@ -5,6 +5,7 @@ use crate::verbosity::Verbosity;
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
 use serde_json;
+use std::io::BufRead;
 use std::io::Write;
 
 /// Input source for hashing
@@ -342,6 +343,189 @@ fn handle_batch_hash(
     // Return error if any files failed and continue_on_error is false
     if !errors.is_empty() && !continue_on_error {
         return Err(anyhow!("One or more files failed to hash"));
+    }
+
+    Ok(())
+}
+
+/// Verify a checksum manifest (sha256sum-style) against the filesystem
+pub fn handle_verify(
+    algo_str: &str,
+    allow_insecure: bool,
+    checksums_file: &str,
+    continue_on_error: bool,
+    format: Option<&str>,
+    verbosity: Verbosity,
+) -> Result<()> {
+    // Parse algorithm
+    let algorithm: Algorithm = algo_str.parse()?;
+
+    // Security gating
+    if algorithm.is_insecure() && !allow_insecure {
+        eprintln!(
+            "WARNING: {} is considered cryptographically insecure and vulnerable to collision attacks.",
+            algorithm.name()
+        );
+        eprintln!("Use --allow-insecure to enable this algorithm (only for legacy compatibility or non-security purposes).");
+        return Err(anyhow!(
+            "Insecure algorithm '{}' requires --allow-insecure flag",
+            algorithm.name()
+        ));
+    }
+    if algorithm.is_insecure() && allow_insecure && !matches!(verbosity, Verbosity::Quiet) {
+        eprintln!(
+            "WARNING: {} is cryptographically broken and should not be used for security purposes.",
+            algorithm.name()
+        );
+    }
+
+    // Determine manifest digest format (default hex)
+    let digest_format = if let Some(fmt) = format {
+        match fmt.to_lowercase().as_str() {
+            "hex" => OutputFormat::Hex,
+            "base64" => OutputFormat::Base64,
+            "raw" => OutputFormat::Raw,
+            _ => {
+                return Err(anyhow!(
+                    "Invalid format '{}'. Supported formats: hex, base64, raw",
+                    fmt
+                ));
+            }
+        }
+    } else {
+        OutputFormat::Hex
+    };
+
+    // Read manifest
+    let manifest_path = std::path::Path::new(checksums_file);
+    let manifest_dir = manifest_path.parent().unwrap_or(std::path::Path::new("."));
+    let file = std::fs::File::open(manifest_path)
+        .with_context(|| format!("Failed to open checksums file: {}", checksums_file))?;
+    let reader = std::io::BufReader::new(file);
+
+    if matches!(verbosity, Verbosity::Verbose) {
+        eprintln!("Using algorithm: {}", algorithm);
+        eprintln!("Verifying manifest: {}", checksums_file);
+    }
+
+    let mut succeeded = 0usize;
+    let mut failed = 0usize;
+
+    for (idx, line_res) in reader.lines().enumerate() {
+        let line = line_res.with_context(|| format!("Failed to read line {}", idx + 1))?;
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        // Parse line with two segments separated by at least one space (prefer two spaces)
+        let (left, right_opt) = if let Some(pos) = trimmed.find("  ") {
+            let (l, r) = trimmed.split_at(pos);
+            (l.trim(), Some(r.trim_start_matches(' ').trim()))
+        } else if let Some(pos) = trimmed.find(' ') {
+            let (l, r) = trimmed.split_at(pos);
+            (l.trim(), Some(r.trim_start()))
+        } else {
+            (trimmed, None)
+        };
+
+        // Helper: validate hex digest length for algorithm
+        let is_valid_hex_for_algo = |s: &str| -> bool {
+            let expected_len = match algorithm {
+                Algorithm::Sha1 => 40,
+                Algorithm::Sha256 => 64,
+                Algorithm::Sha512 => 128,
+                Algorithm::Blake3 => 64, // 32 bytes -> 64 hex chars
+                Algorithm::Md5 => 32,
+            };
+            s.len() == expected_len && s.chars().all(|c| c.is_ascii_hexdigit())
+        };
+
+        let (expected_digest, path_str): (&str, &str) = match (right_opt, digest_format) {
+            (Some(right), OutputFormat::Hex) => {
+                // Try `<DIGEST>  <PATH>` first
+                if is_valid_hex_for_algo(left) {
+                    (left, right)
+                } else if is_valid_hex_for_algo(right) {
+                    // Accept `<PATH>  <DIGEST>`
+                    (right, left)
+                } else {
+                    // Not a valid verification line (e.g., "Algorithm: sha256"), skip gracefully
+                    if matches!(verbosity, Verbosity::Verbose) {
+                        eprintln!("Skipping non-checksum line {}: {}", idx + 1, trimmed);
+                    }
+                    continue;
+                }
+            }
+            (Some(right), _) => {
+                // For non-hex formats, assume `<DIGEST>  <PATH>`
+                (left, right)
+            }
+            (None, _) => {
+                println!("{}: FAILED (invalid format)", trimmed);
+                failed += 1;
+                if !continue_on_error {
+                    return Err(anyhow!("Invalid checksum line at {}", idx + 1));
+                }
+                continue;
+            }
+        };
+
+        // Handle optional leading '*' in path (binary mode in coreutils)
+        let path_clean = path_str.trim_start_matches('*');
+
+        if matches!(verbosity, Verbosity::Verbose) {
+            eprintln!("Verifying file: {}", path_clean);
+        }
+
+        // Resolve path relative to manifest
+        let full_path = manifest_dir.join(path_clean);
+
+        match hash_file(algorithm, full_path.to_str().unwrap_or(path_clean)) {
+            Ok(actual_bytes) => {
+                let actual_str = match digest_format {
+                    OutputFormat::Hex => OutputFormat::Hex.format_bytes(&actual_bytes, false),
+                    OutputFormat::Base64 => OutputFormat::Base64.format_bytes(&actual_bytes, false),
+                    OutputFormat::Raw => {
+                        // Raw expected must match exact bytes; compare using hex fallback (documented limitation)
+                        OutputFormat::Hex.format_bytes(&actual_bytes, false)
+                    }
+                };
+
+                if actual_str == expected_digest {
+                    println!("{}: OK", path_clean);
+                    succeeded += 1;
+                } else {
+                    println!(
+                        "{}: FAILED (mismatch)\n  expected: {}\n  actual:   {}",
+                        path_clean, expected_digest, actual_str
+                    );
+                    failed += 1;
+                    if !continue_on_error {
+                        return Err(anyhow!("Checksum mismatch for {}", path_clean));
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}: FAILED ({})", path_clean, e);
+                failed += 1;
+                if !continue_on_error {
+                    return Err(anyhow!("Failed to verify {}: {}", path_clean, e));
+                }
+            }
+        }
+    }
+
+    if !matches!(verbosity, Verbosity::Quiet) {
+        if failed == 0 {
+            println!("All files verified successfully.");
+        } else {
+            println!("Summary: {} succeeded, {} failed", succeeded, failed);
+        }
+    }
+
+    if failed > 0 {
+        return Err(anyhow!("One or more files failed verification"));
     }
 
     Ok(())
