@@ -71,7 +71,15 @@ pub enum Commands {
 impl Commands {
     pub fn get_hash_params(
         &self,
-    ) -> Option<(&str, bool, Option<&str>, Option<&str>, Option<&str>, bool, bool)> {
+    ) -> Option<(
+        &str,
+        bool,
+        Option<&str>,
+        Option<&str>,
+        Option<&str>,
+        bool,
+        bool,
+    )> {
         match self {
             Commands::Hash {
                 algo,

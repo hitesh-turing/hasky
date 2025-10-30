@@ -108,17 +108,13 @@ pub fn handle_hash(
         }
         InputSource::File(f) => {
             // Hash first - this will give proper error if file doesn't exist
-            let hash = hash_file(algorithm, &f)
-                .with_context(|| format!("Failed to hash file: {}", f))?;
+            let hash =
+                hash_file(algorithm, &f).with_context(|| format!("Failed to hash file: {}", f))?;
             // Then get metadata for size (ignore errors, use 0 if we can't get it)
-            let size = std::fs::metadata(&f)
-                .map(|m| m.len() as usize)
-                .unwrap_or(0);
+            let size = std::fs::metadata(&f).map(|m| m.len() as usize).unwrap_or(0);
             (hash, size)
         }
-        InputSource::Stdin => {
-            hash_stdin(algorithm).context("Failed to hash STDIN")?
-        }
+        InputSource::Stdin => hash_stdin(algorithm).context("Failed to hash STDIN")?,
     };
 
     // Determine output format
@@ -170,7 +166,10 @@ pub fn handle_hash(
             if let Some(label) = display_label {
                 println!("{}", label);
             }
-            println!("Digest: {}", OutputFormat::Hex.format_bytes(&hash_bytes, false));
+            println!(
+                "Digest: {}",
+                OutputFormat::Hex.format_bytes(&hash_bytes, false)
+            );
         }
     }
 

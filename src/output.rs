@@ -45,4 +45,3 @@ pub struct HashJsonOutput {
     pub digest: String,
     pub bytes: usize,
 }
-

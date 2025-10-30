@@ -20,7 +20,14 @@ fn main() -> Result<()> {
         cli.command.get_hash_params()
     {
         handle_hash(
-            algo, allow_insecure, text, file, format, uppercase, json, verbosity,
+            algo,
+            allow_insecure,
+            text,
+            file,
+            format,
+            uppercase,
+            json,
+            verbosity,
         )?;
     }
 
