@@ -5,12 +5,14 @@ A fast, flexible CLI for hashing with multiple algorithms built in Rust.
 ## Features
 
 - 🚀 **Fast**: Built in Rust for maximum performance
+- ⚡ **Parallel Processing**: Automatically parallelizes multi-file hashing using all available CPU cores
 - 🔧 **Flexible**: Support for multiple hashing algorithms (SHA-256, SHA-512, BLAKE3, SHA-1, MD5)
 - 🔒 **Security-Conscious**: Insecure algorithms (MD5, SHA-1) require explicit opt-in
 - 📁 **File Hashing**: Efficiently hash files using chunked reading (64 KiB chunks) without loading entire files into memory
+- 📦 **Batch Mode**: Hash multiple files in one command with automatic parallelization
 - 🎨 **Output Formatting**: Multiple output formats (hex, base64, raw bytes) with JSON support for machine-readable output
 - 🐳 **Dockerized**: Easy deployment with Docker
-- ✅ **Tested**: Comprehensive unit and integration tests (49+ tests with verified test vectors)
+- ✅ **Tested**: Comprehensive unit and integration tests (60+ tests with verified test vectors)
 - 📦 **Lightweight**: Minimal dependencies and small binary size
 
 ## Installation
@@ -71,6 +73,11 @@ echo "hello" | hashy hash --algo sha256
 echo "test" | hashy hash --algo sha256 --format hex
 echo "data" | hashy hash --algo sha256 --json
 
+# Batch mode - hash multiple files in parallel
+hashy hash --algo sha256 file1.txt file2.txt file3.txt
+hashy hash --algo sha256 --json *.txt
+hashy hash --algo sha256 --continue-on-error file1.txt missing.txt file2.txt
+
 # Verbose output
 hashy --verbose hash --text "hello"
 
@@ -96,10 +103,12 @@ Options:
                                   Insecure (requires --allow-insecure): sha1, md5
   -t, --text <TEXT>             Text to hash directly
   -f, --file <FILE>             File to hash (uses chunked reading for efficiency)
+  <FILES>...                    Multiple files to hash in batch mode (automatically parallelized)
       --allow-insecure          Allow use of insecure algorithms (SHA-1 and MD5)
       --format <FORMAT>         Output format: hex, base64, or raw (simplified single-line output)
       --uppercase               Use uppercase letters in hex output (only with --format hex)
       --json                    Output results as JSON (conflicts with --format)
+      --continue-on-error       Continue processing remaining files even if one fails (batch mode only)
   -h, --help                    Print help
 ```
 
@@ -147,6 +156,8 @@ The JSON output includes:
 - `bytes`: The size of the input in bytes
 
 **Note**: File hashing uses chunked reading (64 KiB chunks) to efficiently process large files without loading them entirely into memory. The default output format matches standard tools like `sha256sum` for compatibility.
+
+**Batch Mode**: When multiple files are provided as positional arguments, `hashy` automatically parallelizes the hashing process using all available CPU cores via the `rayon` crate. This significantly improves performance when hashing many files, especially on multi-core systems. The output order is preserved to match the input file order, regardless of parallel execution order.
 
 ## Development
 
@@ -196,7 +207,7 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 
 ## Roadmap
 
-### ✅ Completed (Steps 1-5)
+### ✅ Completed (Steps 1-8, 10)
 - [x] Project scaffolding
 - [x] CLI argument parsing with clap
 - [x] Basic command structure
@@ -212,11 +223,11 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 - [x] Comprehensive test vectors for all algorithms
 - [x] STDIN support (Step 6)
 - [x] Output formatting options (Step 7): hex, base64, raw, and JSON output formats
+- [x] Batch mode with parallel file hashing (Step 8)
+- [x] Parallel processing with rayon (Step 10) - automatically utilizes all CPU cores
 
 ### 🚧 Upcoming
-- [ ] Batch mode (Step 8)
 - [ ] Verification mode (Step 9)
-- [ ] Performance & concurrency (Step 10)
 - [ ] Progress bars (Step 11)
 - [ ] Config file support (Step 12)
 - [ ] Security defaults (Step 13)
@@ -273,5 +284,6 @@ Built with:
 - [serde](https://github.com/serde-rs/serde) - Serialization framework for JSON output
 - [serde_json](https://github.com/serde-rs/json) - JSON serialization
 - [base64](https://github.com/marshallpierce/rust-base64) - Base64 encoding
+- [rayon](https://github.com/rayon-rs/rayon) - Data parallelism library for parallel file processing
 - [RustCrypto](https://github.com/RustCrypto) - Cryptographic algorithms
 

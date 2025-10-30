@@ -1,6 +1,6 @@
 # Multi-stage build for a minimal final image
 # Stage 1: Builder
-FROM rust:1.75-slim as builder
+FROM rust:latest as builder
 
 WORKDIR /usr/src/hashy
 
