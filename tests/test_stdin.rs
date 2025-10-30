@@ -319,13 +319,27 @@ fn test_hash_text_overrides_stdin() {
         .spawn()
         .unwrap();
 
-    child
+    // Write to stdin, but ignore broken pipe errors (expected when --text is provided
+    // and the process closes stdin early)
+    let write_result = child
         .stdin
         .as_mut()
         .unwrap()
-        .write_all(b"this should be ignored")
-        .unwrap();
-    child.stdin.as_mut().unwrap().flush().unwrap();
+        .write_all(b"this should be ignored");
+
+    if let Err(e) = write_result {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            panic!("Unexpected error writing to stdin: {}", e);
+        }
+        // Broken pipe is expected when --text is provided
+    }
+
+    if let Err(e) = child.stdin.as_mut().unwrap().flush() {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            panic!("Unexpected error flushing stdin: {}", e);
+        }
+        // Broken pipe is expected when --text is provided
+    }
     drop(child.stdin.take());
 
     let output = child.wait_with_output().unwrap();
