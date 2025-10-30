@@ -41,6 +41,7 @@ fn resolve_input_source(text: Option<&str>, file: Option<&str>) -> Result<InputS
     Ok(InputSource::Stdin)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handle_hash(
     algo_str: &str,
     allow_insecure: bool,

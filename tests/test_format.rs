@@ -3,7 +3,6 @@ mod common;
 use assert_cmd::prelude::*;
 use common::get_cmd;
 use predicates::prelude::*;
-use serde_json;
 use std::io::Write;
 use std::process::Stdio;
 

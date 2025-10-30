@@ -68,18 +68,19 @@ pub enum Commands {
     },
 }
 
+/// Parameters returned from hash command
+type HashParams<'a> = (
+    &'a str,
+    bool,
+    Option<&'a str>,
+    Option<&'a str>,
+    Option<&'a str>,
+    bool,
+    bool,
+);
+
 impl Commands {
-    pub fn get_hash_params(
-        &self,
-    ) -> Option<(
-        &str,
-        bool,
-        Option<&str>,
-        Option<&str>,
-        Option<&str>,
-        bool,
-        bool,
-    )> {
+    pub fn get_hash_params(&self) -> Option<HashParams> {
         match self {
             Commands::Hash {
                 algo,
