@@ -80,7 +80,7 @@ type HashParams<'a> = (
 );
 
 impl Commands {
-    pub fn get_hash_params(&self) -> Option<HashParams> {
+    pub fn get_hash_params(&self) -> Option<HashParams<'_>> {
         match self {
             Commands::Hash {
                 algo,
