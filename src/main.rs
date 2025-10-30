@@ -16,8 +16,19 @@ fn main() -> Result<()> {
         Verbosity::Normal
     };
 
-    if let Some((algo, allow_insecure, text, file)) = cli.command.get_hash_params() {
-        handle_hash(algo, allow_insecure, text, file, verbosity)?;
+    if let Some((algo, allow_insecure, text, file, format, uppercase, json)) =
+        cli.command.get_hash_params()
+    {
+        handle_hash(
+            algo,
+            allow_insecure,
+            text,
+            file,
+            format,
+            uppercase,
+            json,
+            verbosity,
+        )?;
     }
 
     Ok(())

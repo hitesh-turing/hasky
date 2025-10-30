@@ -8,8 +8,9 @@ A fast, flexible CLI for hashing with multiple algorithms built in Rust.
 - 🔧 **Flexible**: Support for multiple hashing algorithms (SHA-256, SHA-512, BLAKE3, SHA-1, MD5)
 - 🔒 **Security-Conscious**: Insecure algorithms (MD5, SHA-1) require explicit opt-in
 - 📁 **File Hashing**: Efficiently hash files using chunked reading (64 KiB chunks) without loading entire files into memory
+- 🎨 **Output Formatting**: Multiple output formats (hex, base64, raw bytes) with JSON support for machine-readable output
 - 🐳 **Dockerized**: Easy deployment with Docker
-- ✅ **Tested**: Comprehensive unit and integration tests (37+ tests with verified test vectors)
+- ✅ **Tested**: Comprehensive unit and integration tests (49+ tests with verified test vectors)
 - 📦 **Lightweight**: Minimal dependencies and small binary size
 
 ## Installation
@@ -58,6 +59,18 @@ hashy hash --algo sha1 --allow-insecure --text "legacy data"
 # Hash matches standard tools like sha256sum
 hashy hash --file myfile.txt  # Output matches: sha256sum myfile.txt
 
+# Output formatting options
+hashy hash --text "abc" --format hex           # Single-line hex output (default)
+hashy hash --text "abc" --format hex --uppercase  # Uppercase hex
+hashy hash --text "abc" --format base64       # Base64 encoded output
+hashy hash --text "abc" --format raw          # Raw binary bytes
+hashy hash --text "abc" --json                # JSON output for scripts/APIs
+
+# Hash from STDIN
+echo "hello" | hashy hash --algo sha256
+echo "test" | hashy hash --algo sha256 --format hex
+echo "data" | hashy hash --algo sha256 --json
+
 # Verbose output
 hashy --verbose hash --text "hello"
 
@@ -84,6 +97,9 @@ Options:
   -t, --text <TEXT>             Text to hash directly
   -f, --file <FILE>             File to hash (uses chunked reading for efficiency)
       --allow-insecure          Allow use of insecure algorithms (SHA-1 and MD5)
+      --format <FORMAT>         Output format: hex, base64, or raw (simplified single-line output)
+      --uppercase               Use uppercase letters in hex output (only with --format hex)
+      --json                    Output results as JSON (conflicts with --format)
   -h, --help                    Print help
 ```
 
@@ -96,7 +112,41 @@ Options:
 
 **Security Note**: MD5 and SHA-1 are cryptographically broken and vulnerable to collision attacks. They are only available with the `--allow-insecure` flag for legacy compatibility or non-security purposes. A warning will be displayed when using these algorithms.
 
-**Note**: File hashing uses chunked reading (64 KiB chunks) to efficiently process large files without loading them entirely into memory. The output format matches standard tools like `sha256sum` for compatibility.
+**Output Formats:**
+
+By default, `hashy` outputs results in a multi-line format with labels:
+```
+Algorithm: sha256
+Text: abc
+Digest: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+```
+
+When using `--format`, output is simplified to a single line containing only the hash value, making it easier to parse in scripts:
+
+- **`--format hex`**: Lowercase hexadecimal (default when using `--format`)
+- **`--format hex --uppercase`**: Uppercase hexadecimal
+- **`--format base64`**: Base64-encoded digest
+- **`--format raw`**: Raw binary bytes written directly to stdout
+
+**JSON Output:**
+
+Use `--json` for machine-readable structured output suitable for APIs and pipelines:
+```json
+{
+  "algo": "sha256",
+  "source": "text",
+  "digest": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  "bytes": 3
+}
+```
+
+The JSON output includes:
+- `algo`: The algorithm used
+- `source`: Input source type (`text`, `file`, or `stdin`)
+- `digest`: The hash digest in lowercase hex
+- `bytes`: The size of the input in bytes
+
+**Note**: File hashing uses chunked reading (64 KiB chunks) to efficiently process large files without loading them entirely into memory. The default output format matches standard tools like `sha256sum` for compatibility.
 
 ## Development
 
@@ -160,10 +210,10 @@ docker run --rm -v $(pwd):/data hashy:dev hash --file /data/myfile.txt
 - [x] Multiple algorithms (SHA-1, SHA-256, SHA-512, BLAKE3, MD5) (Step 5)
 - [x] Security gating for insecure algorithms (--allow-insecure flag)
 - [x] Comprehensive test vectors for all algorithms
+- [x] STDIN support (Step 6)
+- [x] Output formatting options (Step 7): hex, base64, raw, and JSON output formats
 
 ### 🚧 Upcoming
-- [ ] STDIN support (Step 6)
-- [ ] Output formatting options (Step 7)
 - [ ] Batch mode (Step 8)
 - [ ] Verification mode (Step 9)
 - [ ] Performance & concurrency (Step 10)
@@ -220,5 +270,8 @@ Built with:
 - [blake3](https://github.com/BLAKE3-team/BLAKE3) - BLAKE3 hashing implementation
 - [digest](https://github.com/RustCrypto/hashes) - Unified trait for hash functions
 - [hex](https://github.com/KokaKiwi/rust-hex) - Hexadecimal encoding
+- [serde](https://github.com/serde-rs/serde) - Serialization framework for JSON output
+- [serde_json](https://github.com/serde-rs/json) - JSON serialization
+- [base64](https://github.com/marshallpierce/rust-base64) - Base64 encoding
 - [RustCrypto](https://github.com/RustCrypto) - Cryptographic algorithms
 
