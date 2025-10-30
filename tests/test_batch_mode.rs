@@ -257,3 +257,157 @@ fn test_batch_hash_uppercase() {
         "2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824",
     ));
 }
+
+#[test]
+fn test_batch_hash_order_preservation() {
+    // Test that parallel processing preserves the order of files
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let files: Vec<_> = (1..=10)
+        .map(|i| {
+            let file = temp_dir.path().join(format!("file{}.txt", i));
+            fs::write(&file, format!("content{}", i)).expect("Failed to write test file");
+            file
+        })
+        .collect();
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash").arg("--algo").arg("sha256");
+    for file in &files {
+        cmd.arg(file.as_os_str());
+    }
+
+    let output = cmd.output().expect("Failed to execute command");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+
+    // Verify that files appear in the same order as input
+    for (i, line) in lines.iter().enumerate() {
+        let file_name = format!("file{}.txt", i + 1);
+        assert!(
+            line.contains(&file_name),
+            "Expected file {} at position {}, got: {}",
+            file_name,
+            i,
+            line
+        );
+    }
+}
+
+#[test]
+fn test_batch_hash_many_files() {
+    // Test parallel processing with many files
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let mut files = Vec::new();
+    for i in 1..=20 {
+        let file = temp_dir.path().join(format!("file{}.txt", i));
+        fs::write(&file, format!("data{}", i)).expect("Failed to write test file");
+        files.push(file);
+    }
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash").arg("--algo").arg("sha256");
+    for file in &files {
+        cmd.arg(file.as_os_str());
+    }
+
+    let output = cmd.output().expect("Failed to execute command");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.trim().lines().collect();
+    assert_eq!(lines.len(), 20, "Expected 20 output lines");
+
+    // Verify all files were hashed
+    for i in 1..=20 {
+        let file_name = format!("file{}.txt", i);
+        assert!(
+            stdout.contains(&file_name),
+            "Expected output to contain {}",
+            file_name
+        );
+    }
+}
+
+#[test]
+fn test_batch_hash_all_algorithms() {
+    // Test parallel processing works with all algorithms
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let file1 = temp_dir.path().join("file1.txt");
+    let file2 = temp_dir.path().join("file2.txt");
+    let file3 = temp_dir.path().join("file3.txt");
+
+    fs::write(&file1, "test1").expect("Failed to write test file");
+    fs::write(&file2, "test2").expect("Failed to write test file");
+    fs::write(&file3, "test3").expect("Failed to write test file");
+
+    for algo in &["sha256", "sha512", "blake3"] {
+        let mut cmd = get_cmd();
+        cmd.arg("hash")
+            .arg("--algo")
+            .arg(algo)
+            .arg(file1.as_os_str())
+            .arg(file2.as_os_str())
+            .arg(file3.as_os_str());
+
+        let output = cmd.output().expect("Failed to execute command");
+        assert!(
+            output.status.success(),
+            "Failed to hash files with algorithm {}",
+            algo
+        );
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("file1.txt"));
+        assert!(stdout.contains("file2.txt"));
+        assert!(stdout.contains("file3.txt"));
+    }
+}
+
+#[test]
+fn test_batch_hash_json_order_preservation() {
+    // Test that JSON output preserves order with parallel processing
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let files: Vec<_> = (1..=5)
+        .map(|i| {
+            let file = temp_dir.path().join(format!("file{}.txt", i));
+            fs::write(&file, format!("data{}", i)).expect("Failed to write test file");
+            file
+        })
+        .collect();
+
+    let mut cmd = get_cmd();
+    cmd.arg("hash").arg("--algo").arg("sha256").arg("--json");
+    for file in &files {
+        cmd.arg(file.as_os_str());
+    }
+
+    let output = cmd.output().expect("Failed to execute command");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Failed to parse JSON output");
+
+    let results = json["results"]
+        .as_array()
+        .expect("Expected 'results' to be an array");
+
+    assert_eq!(results.len(), 5);
+
+    // Verify order is preserved
+    for (i, result) in results.iter().enumerate() {
+        let expected_file = format!("file{}.txt", i + 1);
+        let actual_file = result["file_path"]
+            .as_str()
+            .expect("Expected 'file_path' to be a string");
+        assert!(
+            actual_file.contains(&expected_file),
+            "Expected file {} at position {}, got {}",
+            expected_file,
+            i,
+            actual_file
+        );
+    }
+}

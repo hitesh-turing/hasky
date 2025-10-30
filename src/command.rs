@@ -4,6 +4,7 @@ use crate::output::{BatchHashJsonOutput, HashJsonOutput, OutputFormat};
 use crate::verbosity::Verbosity;
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
+use rayon::prelude::*;
 use serde_json;
 use std::io::BufRead;
 use std::io::Write;
@@ -216,51 +217,68 @@ fn handle_batch_hash(
     json: bool,
     verbosity: Verbosity,
 ) -> Result<()> {
-    let mut results = Vec::new();
-    let mut errors = Vec::new();
-
     if matches!(verbosity, Verbosity::Verbose) {
         eprintln!("Using algorithm: {}", algorithm);
         eprintln!("Hashing {} files", files.len());
     }
 
-    // Process each file
-    for file_path in files {
-        if matches!(verbosity, Verbosity::Verbose) {
-            eprintln!("Hashing file: {}", file_path);
-        }
-
-        match hash_file(algorithm, file_path) {
-            Ok(hash_bytes) => {
-                let input_size = std::fs::metadata(file_path)
-                    .map(|m| m.len() as usize)
-                    .unwrap_or(0);
-
-                results.push(BatchHashResult {
-                    file_path: file_path.clone(),
-                    success: true,
-                    hash_bytes: Some(hash_bytes),
-                    input_size: Some(input_size),
-                    error: None,
-                });
+    // Process each file in parallel using rayon
+    // Using par_iter() which preserves order when collected
+    let results: Vec<BatchHashResult> = files
+        .par_iter()
+        .map(|file_path| {
+            if matches!(verbosity, Verbosity::Verbose) {
+                eprintln!("Hashing file: {}", file_path);
             }
-            Err(e) => {
-                let error_msg = format!("{}", e);
-                errors.push((file_path.clone(), error_msg.clone()));
 
-                results.push(BatchHashResult {
-                    file_path: file_path.clone(),
-                    success: false,
-                    hash_bytes: None,
-                    input_size: None,
-                    error: Some(error_msg),
-                });
+            match hash_file(algorithm, file_path) {
+                Ok(hash_bytes) => {
+                    let input_size = std::fs::metadata(file_path)
+                        .map(|m| m.len() as usize)
+                        .unwrap_or(0);
 
-                if !continue_on_error {
-                    return Err(anyhow!("Failed to hash file '{}': {}", file_path, e));
+                    BatchHashResult {
+                        file_path: file_path.clone(),
+                        success: true,
+                        hash_bytes: Some(hash_bytes),
+                        input_size: Some(input_size),
+                        error: None,
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("{}", e);
+                    BatchHashResult {
+                        file_path: file_path.clone(),
+                        success: false,
+                        hash_bytes: None,
+                        input_size: None,
+                        error: Some(error_msg),
+                    }
                 }
             }
-        }
+        })
+        .collect();
+
+    // Collect errors and check if we should fail early
+    let errors: Vec<(String, String)> = results
+        .iter()
+        .filter_map(|r| {
+            if r.success {
+                None
+            } else {
+                Some((r.file_path.clone(), r.error.clone().unwrap_or_default()))
+            }
+        })
+        .collect();
+
+    // If continue_on_error is false and we have errors, return early
+    if !errors.is_empty() && !continue_on_error {
+        let (file_path, error_msg) = &errors[0];
+        return Err(anyhow!(
+            "Failed to hash file '{}': {}",
+            file_path,
+            error_msg
+        ));
     }
 
     // Output results
