@@ -11,7 +11,7 @@ pub fn handle_hash(
     verbosity: Verbosity,
 ) -> Result<()> {
     // Parse algorithm
-    let algorithm = Algorithm::from_str(algo_str)?;
+    let algorithm: Algorithm = algo_str.parse()?;
 
     // Check security gating
     if algorithm.is_insecure() && !allow_insecure {

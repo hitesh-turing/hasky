@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use std::fmt;
+use std::str::FromStr;
 
 /// Supported hash algorithms
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,18 +13,6 @@ pub enum Algorithm {
 }
 
 impl Algorithm {
-    /// Parse algorithm from string (case-insensitive)
-    pub fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "sha1" => Ok(Algorithm::Sha1),
-            "sha256" => Ok(Algorithm::Sha256),
-            "sha512" => Ok(Algorithm::Sha512),
-            "blake3" => Ok(Algorithm::Blake3),
-            "md5" => Ok(Algorithm::Md5),
-            _ => Err(anyhow!("Unsupported algorithm: {}", s)),
-        }
-    }
-
     /// Check if algorithm is considered insecure
     pub fn is_insecure(&self) -> bool {
         matches!(self, Algorithm::Sha1 | Algorithm::Md5)
@@ -37,6 +26,22 @@ impl Algorithm {
             Algorithm::Sha512 => "sha512",
             Algorithm::Blake3 => "blake3",
             Algorithm::Md5 => "md5",
+        }
+    }
+}
+
+impl FromStr for Algorithm {
+    type Err = anyhow::Error;
+
+    /// Parse algorithm from string (case-insensitive)
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "sha1" => Ok(Algorithm::Sha1),
+            "sha256" => Ok(Algorithm::Sha256),
+            "sha512" => Ok(Algorithm::Sha512),
+            "blake3" => Ok(Algorithm::Blake3),
+            "md5" => Ok(Algorithm::Md5),
+            _ => Err(anyhow!("Unsupported algorithm: {}", s)),
         }
     }
 }
