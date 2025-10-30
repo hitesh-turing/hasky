@@ -74,6 +74,38 @@ pub enum Commands {
         #[arg(long, conflicts_with = "format")]
         json: bool,
     },
+
+    /// Verify file integrity against checksum manifest
+    Verify {
+        /// Path to checksum manifest file
+        checksums_file: String,
+
+        /// Hash algorithm to use
+        ///
+        /// Supported algorithms: sha256 (default), sha512, blake3
+        ///
+        /// Insecure algorithms (sha1, md5) require --allow-insecure flag.
+        #[arg(
+            short,
+            long,
+            value_name = "ALGORITHM",
+            default_value = "sha256",
+            help = "Hash algorithm to use [possible values: sha256, sha512, blake3, sha1, md5]"
+        )]
+        algo: String,
+
+        /// Allow use of insecure algorithms (SHA-1 and MD5)
+        #[arg(long)]
+        allow_insecure: bool,
+
+        /// Manifest digest format [possible values: hex, base64, raw]
+        #[arg(long, value_name = "FORMAT")]
+        format: Option<String>,
+
+        /// Continue verification even if some files fail
+        #[arg(long)]
+        continue_on_error: bool,
+    },
 }
 
 /// Parameters returned from hash command
@@ -87,6 +119,15 @@ type HashParams<'a> = (
     Option<&'a str>,
     bool,
     bool,
+);
+
+/// Parameters returned from verify command
+type VerifyParams<'a> = (
+    &'a str,         // algo
+    bool,            // allow_insecure
+    &'a str,         // checksums_file
+    bool,            // continue_on_error
+    Option<&'a str>, // format
 );
 
 impl Commands {
@@ -113,6 +154,26 @@ impl Commands {
                 *uppercase,
                 *json,
             )),
+            _ => None,
+        }
+    }
+
+    pub fn get_verify_params(&self) -> Option<VerifyParams<'_>> {
+        match self {
+            Commands::Verify {
+                checksums_file,
+                algo,
+                allow_insecure,
+                format,
+                continue_on_error,
+            } => Some((
+                algo,
+                *allow_insecure,
+                checksums_file.as_str(),
+                *continue_on_error,
+                format.as_deref(),
+            )),
+            _ => None,
         }
     }
 }
