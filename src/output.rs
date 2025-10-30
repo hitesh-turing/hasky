@@ -44,4 +44,19 @@ pub struct HashJsonOutput {
     pub source: String,
     pub digest: String,
     pub bytes: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// JSON output structure for batch hash results
+#[derive(Debug, Serialize)]
+pub struct BatchHashJsonOutput {
+    pub algo: String,
+    pub results: Vec<HashJsonOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
