@@ -1,8 +1,11 @@
 use crate::algorithm::Algorithm;
 use crate::hash::{hash_data, hash_file, hash_stdin};
+use crate::output::{HashJsonOutput, OutputFormat};
 use crate::verbosity::Verbosity;
 use anyhow::{anyhow, Context, Result};
 use atty::Stream;
+use serde_json;
+use std::io::Write;
 
 /// Input source for hashing
 enum InputSource {
@@ -43,6 +46,9 @@ pub fn handle_hash(
     allow_insecure: bool,
     text: Option<&str>,
     file: Option<&str>,
+    format: Option<&str>,
+    uppercase: bool,
+    json: bool,
     verbosity: Verbosity,
 ) -> Result<()> {
     // Parse algorithm
@@ -72,7 +78,13 @@ pub fn handle_hash(
     // Resolve input source
     let input_source = resolve_input_source(text, file)?;
 
-    // Store display info before consuming input_source
+    // Store source name (will get size later for stdin)
+    let source_name = match &input_source {
+        InputSource::Text(_) => "text".to_string(),
+        InputSource::File(_) => "file".to_string(),
+        InputSource::Stdin => "stdin".to_string(),
+    };
+
     let display_label = match &input_source {
         InputSource::Text(t) => Some(format!("Text: {}", t)),
         InputSource::File(f) => Some(format!("File: {}", f)),
@@ -88,22 +100,78 @@ pub fn handle_hash(
         }
     }
 
-    // Compute hash based on algorithm and input type
-    let hash = match input_source {
-        InputSource::Text(t) => hash_data(algorithm, t.as_bytes()),
-        InputSource::File(f) => {
-            hash_file(algorithm, &f).with_context(|| format!("Failed to hash file: {}", f))?
+    // Compute hash based on algorithm and input type, also get input size
+    let (hash_bytes, input_size) = match input_source {
+        InputSource::Text(t) => {
+            let size = t.len();
+            (hash_data(algorithm, t.as_bytes()), size)
         }
-        InputSource::Stdin => hash_stdin(algorithm).context("Failed to hash STDIN")?,
+        InputSource::File(f) => {
+            // Hash first - this will give proper error if file doesn't exist
+            let hash = hash_file(algorithm, &f)
+                .with_context(|| format!("Failed to hash file: {}", f))?;
+            // Then get metadata for size (ignore errors, use 0 if we can't get it)
+            let size = std::fs::metadata(&f)
+                .map(|m| m.len() as usize)
+                .unwrap_or(0);
+            (hash, size)
+        }
+        InputSource::Stdin => {
+            hash_stdin(algorithm).context("Failed to hash STDIN")?
+        }
+    };
+
+    // Determine output format
+    let output_format = if json {
+        None // JSON output doesn't use format enum
+    } else if let Some(format_str) = format {
+        match format_str.to_lowercase().as_str() {
+            "hex" => Some(OutputFormat::Hex),
+            "base64" => Some(OutputFormat::Base64),
+            "raw" => Some(OutputFormat::Raw),
+            _ => {
+                return Err(anyhow!(
+                    "Invalid format '{}'. Supported formats: hex, base64, raw",
+                    format_str
+                ));
+            }
+        }
+    } else {
+        None // Default multi-line format
     };
 
     // Output the hash
     if !matches!(verbosity, Verbosity::Quiet) {
-        println!("Algorithm: {}", algorithm);
-        if let Some(label) = display_label {
-            println!("{}", label);
+        if json {
+            // JSON output
+            let digest_str = OutputFormat::Hex.format_bytes(&hash_bytes, false);
+            let json_output = HashJsonOutput {
+                algo: algorithm.name().to_string(),
+                source: source_name,
+                digest: digest_str,
+                bytes: input_size,
+            };
+            let json_str = serde_json::to_string(&json_output)?;
+            println!("{}", json_str);
+        } else if let Some(fmt) = output_format {
+            // Simplified single-line format output
+            if fmt.is_raw() {
+                // For raw format, write bytes directly to stdout
+                std::io::stdout()
+                    .write_all(&hash_bytes)
+                    .context("Failed to write raw bytes to stdout")?;
+            } else {
+                let formatted = fmt.format_bytes(&hash_bytes, uppercase);
+                println!("{}", formatted);
+            }
+        } else {
+            // Default multi-line format
+            println!("Algorithm: {}", algorithm);
+            if let Some(label) = display_label {
+                println!("{}", label);
+            }
+            println!("Digest: {}", OutputFormat::Hex.format_bytes(&hash_bytes, false));
         }
-        println!("Digest: {}", hash);
     }
 
     Ok(())

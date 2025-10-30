@@ -53,18 +53,43 @@ pub enum Commands {
         /// File to hash
         #[arg(short, long, value_name = "FILE")]
         file: Option<String>,
+
+        /// Output format [possible values: hex, base64, raw]
+        #[arg(long, value_name = "FORMAT", conflicts_with = "json")]
+        format: Option<String>,
+
+        /// Use uppercase letters in hex output
+        #[arg(long)]
+        uppercase: bool,
+
+        /// Output results as JSON
+        #[arg(long, conflicts_with = "format")]
+        json: bool,
     },
 }
 
 impl Commands {
-    pub fn get_hash_params(&self) -> Option<(&str, bool, Option<&str>, Option<&str>)> {
+    pub fn get_hash_params(
+        &self,
+    ) -> Option<(&str, bool, Option<&str>, Option<&str>, Option<&str>, bool, bool)> {
         match self {
             Commands::Hash {
                 algo,
                 allow_insecure,
                 text,
                 file,
-            } => Some((algo, *allow_insecure, text.as_deref(), file.as_deref())),
+                format,
+                uppercase,
+                json,
+            } => Some((
+                algo,
+                *allow_insecure,
+                text.as_deref(),
+                file.as_deref(),
+                format.as_deref(),
+                *uppercase,
+                *json,
+            )),
         }
     }
 }

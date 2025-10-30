@@ -7,39 +7,40 @@ use sha2::{Sha256, Sha512};
 use std::fs::File;
 use std::io::{stdin, BufReader, Read};
 
-/// Hash data using the specified algorithm
-pub fn hash_data(algorithm: Algorithm, data: &[u8]) -> String {
+/// Hash data using the specified algorithm, returns raw bytes
+pub fn hash_data(algorithm: Algorithm, data: &[u8]) -> Vec<u8> {
     match algorithm {
         Algorithm::Sha1 => {
             let mut hasher = Sha1::new();
             hasher.update(data);
-            hex::encode(hasher.finalize())
+            hasher.finalize().to_vec()
         }
         Algorithm::Sha256 => {
             let mut hasher = Sha256::new();
             hasher.update(data);
-            hex::encode(hasher.finalize())
+            hasher.finalize().to_vec()
         }
         Algorithm::Sha512 => {
             let mut hasher = Sha512::new();
             hasher.update(data);
-            hex::encode(hasher.finalize())
+            hasher.finalize().to_vec()
         }
         Algorithm::Blake3 => {
             let hash = blake3::hash(data);
-            hex::encode(hash.as_bytes())
+            hash.as_bytes().to_vec()
         }
         Algorithm::Md5 => {
             let mut hasher = Md5::new();
             hasher.update(data);
-            hex::encode(hasher.finalize())
+            hasher.finalize().to_vec()
         }
     }
 }
 
 /// Hash a file using the specified algorithm by reading it in chunks (64 KiB).
 /// This avoids loading the entire file into memory.
-pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
+/// Returns raw bytes of the hash.
+pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<Vec<u8>> {
     const CHUNK_SIZE: usize = 64 * 1024; // 64 KiB
 
     let file =
@@ -62,7 +63,7 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
 
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_vec())
         }
         Algorithm::Sha256 => {
             let mut hasher = Sha256::new();
@@ -77,7 +78,7 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
 
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_vec())
         }
         Algorithm::Sha512 => {
             let mut hasher = Sha512::new();
@@ -92,7 +93,7 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
 
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_vec())
         }
         Algorithm::Blake3 => {
             let mut hasher = blake3::Hasher::new();
@@ -107,7 +108,7 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
 
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize().as_bytes()))
+            Ok(hasher.finalize().as_bytes().to_vec())
         }
         Algorithm::Md5 => {
             let mut hasher = Md5::new();
@@ -122,14 +123,15 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
 
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_vec())
         }
     }
 }
 
 /// Hash STDIN using the specified algorithm by reading it in chunks (64 KiB).
 /// This avoids loading the entire input into memory.
-pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
+/// Returns (hash_bytes, input_size)
+pub fn hash_stdin(algorithm: Algorithm) -> Result<(Vec<u8>, usize)> {
     const CHUNK_SIZE: usize = 64 * 1024; // 64 KiB
 
     let stdin_handle = stdin();
@@ -139,6 +141,7 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
     match algorithm {
         Algorithm::Sha1 => {
             let mut hasher = Sha1::new();
+            let mut total_bytes = 0;
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
@@ -148,12 +151,14 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
                     break;
                 }
 
+                total_bytes += bytes_read;
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok((hasher.finalize().to_vec(), total_bytes))
         }
         Algorithm::Sha256 => {
             let mut hasher = Sha256::new();
+            let mut total_bytes = 0;
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
@@ -163,12 +168,14 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
                     break;
                 }
 
+                total_bytes += bytes_read;
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok((hasher.finalize().to_vec(), total_bytes))
         }
         Algorithm::Sha512 => {
             let mut hasher = Sha512::new();
+            let mut total_bytes = 0;
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
@@ -178,12 +185,14 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
                     break;
                 }
 
+                total_bytes += bytes_read;
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok((hasher.finalize().to_vec(), total_bytes))
         }
         Algorithm::Blake3 => {
             let mut hasher = blake3::Hasher::new();
+            let mut total_bytes = 0;
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
@@ -193,12 +202,14 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
                     break;
                 }
 
+                total_bytes += bytes_read;
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize().as_bytes()))
+            Ok((hasher.finalize().as_bytes().to_vec(), total_bytes))
         }
         Algorithm::Md5 => {
             let mut hasher = Md5::new();
+            let mut total_bytes = 0;
             loop {
                 let bytes_read = reader
                     .read(&mut buffer)
@@ -208,9 +219,10 @@ pub fn hash_stdin(algorithm: Algorithm) -> Result<String> {
                     break;
                 }
 
+                total_bytes += bytes_read;
                 hasher.update(&buffer[..bytes_read]);
             }
-            Ok(hex::encode(hasher.finalize()))
+            Ok((hasher.finalize().to_vec(), total_bytes))
         }
     }
 }
