@@ -47,12 +47,20 @@ pub enum Commands {
         allow_insecure: bool,
 
         /// Text to hash directly
-        #[arg(short, long, value_name = "TEXT", conflicts_with = "file")]
+        #[arg(short, long, value_name = "TEXT", conflicts_with_all = &["file", "files"])]
         text: Option<String>,
 
-        /// File to hash
-        #[arg(short, long, value_name = "FILE")]
+        /// File to hash (use positional arguments for multiple files)
+        #[arg(short, long, value_name = "FILE", conflicts_with = "files")]
         file: Option<String>,
+
+        /// Files to hash in batch mode (positional arguments)
+        #[arg(conflicts_with_all = &["text", "file"])]
+        files: Vec<String>,
+
+        /// Continue processing even if some files fail
+        #[arg(long)]
+        continue_on_error: bool,
 
         /// Output format [possible values: hex, base64, raw]
         #[arg(long, value_name = "FORMAT", conflicts_with = "json")]
@@ -74,6 +82,8 @@ type HashParams<'a> = (
     bool,
     Option<&'a str>,
     Option<&'a str>,
+    &'a [String],
+    bool,
     Option<&'a str>,
     bool,
     bool,
@@ -87,6 +97,8 @@ impl Commands {
                 allow_insecure,
                 text,
                 file,
+                files,
+                continue_on_error,
                 format,
                 uppercase,
                 json,
@@ -95,6 +107,8 @@ impl Commands {
                 *allow_insecure,
                 text.as_deref(),
                 file.as_deref(),
+                files.as_slice(),
+                *continue_on_error,
                 format.as_deref(),
                 *uppercase,
                 *json,
