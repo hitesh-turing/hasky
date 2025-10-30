@@ -1,7 +1,7 @@
 mod common;
 
-use common::get_cmd;
 use assert_cmd::prelude::*;
+use common::get_cmd;
 use predicates::prelude::*;
 
 #[test]
@@ -56,4 +56,3 @@ fn test_unsupported_algorithm() {
         .failure()
         .stderr(predicate::str::contains("Unsupported algorithm"));
 }
-

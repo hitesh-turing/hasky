@@ -68,4 +68,3 @@ pub fn handle_hash(
 
     Ok(())
 }
-

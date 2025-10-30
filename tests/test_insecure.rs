@@ -1,7 +1,7 @@
 mod common;
 
-use common::get_cmd;
 use assert_cmd::prelude::*;
+use common::get_cmd;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
@@ -136,4 +136,3 @@ fn test_hash_file_md5_with_allow_insecure() {
         .stdout(predicate::str::contains("900150983cd24fb0d6963f7d28e17f72"))
         .stderr(predicate::str::contains("WARNING"));
 }
-

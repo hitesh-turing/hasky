@@ -1,7 +1,7 @@
 mod common;
 
-use common::{compute_file_sha256, get_cmd};
 use assert_cmd::prelude::*;
+use common::{compute_file_sha256, get_cmd};
 use predicates::prelude::*;
 use std::fs;
 use std::io::Write;
@@ -173,4 +173,3 @@ fn test_hash_file_quiet() {
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).trim().is_empty());
 }
-

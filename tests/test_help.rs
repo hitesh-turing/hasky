@@ -1,7 +1,7 @@
 mod common;
 
-use common::get_cmd;
 use assert_cmd::prelude::*;
+use common::get_cmd;
 use predicates::prelude::*;
 
 #[test]
@@ -45,4 +45,3 @@ fn test_help_shows_algorithms() {
         .stdout(predicate::str::contains("blake3"))
         .stdout(predicate::str::contains("--allow-insecure"));
 }
-

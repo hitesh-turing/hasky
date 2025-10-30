@@ -126,4 +126,3 @@ pub fn hash_file(algorithm: Algorithm, file_path: &str) -> Result<String> {
         }
     }
 }
-

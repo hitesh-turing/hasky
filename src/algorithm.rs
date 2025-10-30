@@ -46,4 +46,3 @@ impl fmt::Display for Algorithm {
         write!(f, "{}", self.name())
     }
 }
-

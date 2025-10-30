@@ -28,4 +28,3 @@ pub fn compute_file_sha256(file_path: &std::path::Path) -> String {
 
     hex::encode(hasher.finalize())
 }
-

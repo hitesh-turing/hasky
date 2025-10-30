@@ -1,7 +1,7 @@
 mod common;
 
-use common::get_cmd;
 use assert_cmd::prelude::*;
+use common::get_cmd;
 use predicates::prelude::*;
 
 #[test]
@@ -41,4 +41,3 @@ fn test_conflicting_quiet_and_verbose() {
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));
 }
-

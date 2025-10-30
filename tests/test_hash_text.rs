@@ -1,7 +1,7 @@
 mod common;
 
-use common::get_cmd;
 use assert_cmd::prelude::*;
+use common::get_cmd;
 use predicates::prelude::*;
 
 #[test]
@@ -114,4 +114,3 @@ fn test_blake3_empty_string() {
         "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
     ));
 }
-
