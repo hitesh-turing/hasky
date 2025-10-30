@@ -1,7 +1,42 @@
 use crate::algorithm::Algorithm;
-use crate::hash::{hash_data, hash_file};
+use crate::hash::{hash_data, hash_file, hash_stdin};
 use crate::verbosity::Verbosity;
 use anyhow::{anyhow, Context, Result};
+use atty::Stream;
+
+/// Input source for hashing
+enum InputSource {
+    Text(String),
+    File(String),
+    Stdin,
+}
+
+/// Resolve the input source from CLI arguments
+fn resolve_input_source(text: Option<&str>, file: Option<&str>) -> Result<InputSource> {
+    // If text is provided, use it
+    if let Some(t) = text {
+        return Ok(InputSource::Text(t.to_string()));
+    }
+
+    // If file is provided, check if it's "-" (STDIN placeholder)
+    if let Some(f) = file {
+        if f == "-" {
+            return Ok(InputSource::Stdin);
+        }
+        return Ok(InputSource::File(f.to_string()));
+    }
+
+    // No explicit input provided - check if STDIN is piped
+    if atty::is(Stream::Stdin) {
+        // Running interactively with no input - show friendly error
+        return Err(anyhow!(
+            "No input provided. Use --text, --file, or pipe data via STDIN."
+        ));
+    }
+
+    // STDIN is piped (not a TTY), read from it
+    Ok(InputSource::Stdin)
+}
 
 pub fn handle_hash(
     algo_str: &str,
@@ -34,34 +69,39 @@ pub fn handle_hash(
         );
     }
 
+    // Resolve input source
+    let input_source = resolve_input_source(text, file)?;
+
+    // Store display info before consuming input_source
+    let display_label = match &input_source {
+        InputSource::Text(t) => Some(format!("Text: {}", t)),
+        InputSource::File(f) => Some(format!("File: {}", f)),
+        InputSource::Stdin => None, // Don't print label for STDIN
+    };
+
     if matches!(verbosity, Verbosity::Verbose) {
         eprintln!("Using algorithm: {}", algorithm);
-        if let Some(t) = text {
-            eprintln!("Hashing text: {}", t);
-        } else if let Some(f) = file {
-            eprintln!("Hashing file: {}", f);
-        } else {
-            eprintln!("Ready to hash from stdin");
+        match &input_source {
+            InputSource::Text(t) => eprintln!("Hashing text: {}", t),
+            InputSource::File(f) => eprintln!("Hashing file: {}", f),
+            InputSource::Stdin => eprintln!("Hashing from STDIN"),
         }
     }
 
     // Compute hash based on algorithm and input type
-    let hash = if let Some(t) = text {
-        hash_data(algorithm, t.as_bytes())
-    } else if let Some(f) = file {
-        hash_file(algorithm, f).with_context(|| format!("Failed to hash file: {}", f))?
-    } else {
-        // TODO: Implement stdin reading in next step
-        return Err(anyhow!("Stdin hashing not yet implemented"));
+    let hash = match input_source {
+        InputSource::Text(t) => hash_data(algorithm, t.as_bytes()),
+        InputSource::File(f) => {
+            hash_file(algorithm, &f).with_context(|| format!("Failed to hash file: {}", f))?
+        }
+        InputSource::Stdin => hash_stdin(algorithm).context("Failed to hash STDIN")?,
     };
 
     // Output the hash
     if !matches!(verbosity, Verbosity::Quiet) {
         println!("Algorithm: {}", algorithm);
-        if let Some(t) = text {
-            println!("Text: {}", t);
-        } else if let Some(f) = file {
-            println!("File: {}", f);
+        if let Some(label) = display_label {
+            println!("{}", label);
         }
         println!("Digest: {}", hash);
     }
